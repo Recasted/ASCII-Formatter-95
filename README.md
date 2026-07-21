@@ -1,6 +1,6 @@
-# ASCII Formatter 95
+# Sog95 — ASCII Formatter
 
-ASCII Formatter 95 is a small offline Windows formatter that turns ordinary notes into a clean, decorative plain-text document.
+Sog95 is a small offline Windows formatter that turns ordinary notes into a clean, decorative plain-text document.
 
 It includes:
 
@@ -24,7 +24,7 @@ It includes:
 
 ## Download and use
 
-Download `ASCII-Formatter-95.exe`, open it, fill in the fields on the left, and use **Copy** or **Export...**. Windows may show a SmartScreen prompt because the executable is not code-signed.
+Download `Sog95.exe`, open it, fill in the fields on the left, and use **Copy** or **Export...**. Windows may show a SmartScreen prompt because the executable is not code-signed.
 
 The formatter runs locally and contains no networking or tracking features.
 
@@ -42,7 +42,7 @@ Install the title-font dependency first with `python -m pip install pyfiglet`.
 
 ```powershell
 python -m pip install pyinstaller
-python -m PyInstaller --onefile --windowed --name ASCII-Formatter-95 ascii_formatter.py
+python -m PyInstaller --onefile --windowed --name Sog95 ascii_formatter.py
 ```
 
 The executable will appear in `dist`.

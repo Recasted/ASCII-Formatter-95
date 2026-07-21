@@ -217,7 +217,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.auto_fit = tk.BooleanVar(value=True)
-        root.title("ASCII Formatter 95")
+        root.title("Sog95")
         icon_path = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), "ascii_formatter_95.ico")
         if os.path.exists(icon_path):
             try:
@@ -230,7 +230,7 @@ class App:
 
         titlebar = tk.Frame(root, bg=BLUE, bd=2, relief="raised")
         titlebar.pack(fill="x", padx=4, pady=(4, 0))
-        tk.Label(titlebar, text="▣  ASCII Formatter 95", bg=BLUE, fg=WHITE,
+        tk.Label(titlebar, text="▣  Sog95 — ASCII Formatter", bg=BLUE, fg=WHITE,
                  font=("MS Sans Serif", 10, "bold"), anchor="w").pack(side="left", fill="x", expand=True, padx=5, pady=3)
         tk.Button(titlebar, text="?", width=3, bg=BG, relief="raised", bd=2,
                   command=self.about).pack(side="right", padx=2, pady=2)
@@ -240,7 +240,7 @@ class App:
         self.add_menu(toolbar, "File", (("Export...", self.export), (None, None), ("Exit", root.destroy)))
         self.add_menu(toolbar, "Edit", (("Copy all", self.copy), ("Clear fields", self.clear)))
         self.add_menu(toolbar, "Format", (("Auto-fit width", self.toggle_auto_fit, "check"),))
-        self.add_menu(toolbar, "Help", (("About ASCII Formatter 95", self.about),))
+        self.add_menu(toolbar, "Help", (("About Sog95", self.about),))
 
         main = tk.PanedWindow(root, orient="horizontal", bg=BG, sashwidth=7, bd=2, relief="sunken")
         main.pack(fill="both", expand=True, padx=7, pady=7)
@@ -351,8 +351,8 @@ class App:
         self.status.configure(text="All fields cleared")
 
     def about(self):
-        messagebox.showinfo("About ASCII Formatter 95",
-                            "ASCII Formatter 95\n\nA local, offline formatter with automatic sections, ASCII trees, live preview, copying, and text export.")
+        messagebox.showinfo("About Sog95",
+                            "Sog95 — ASCII Formatter\n\nA local, offline formatter with automatic sections, ASCII trees, live preview, copying, and text export.")
 
     def field(self, parent, label, one_line=False):
         frame = tk.Frame(parent, bg=BG)
