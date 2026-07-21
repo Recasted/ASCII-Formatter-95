@@ -282,9 +282,9 @@ class App:
         self.title_styles = ["sog95_block"] + fonts
         style_controls = tk.Frame(style_frame, bg=BG)
         style_controls.pack(fill="x")
-        self.style_search = tk.Entry(style_controls, width=11, relief="sunken", bd=2,
+        self.style_search = tk.Entry(style_controls, relief="sunken", bd=2,
                                      font=("MS Sans Serif", 8))
-        self.style_search.pack(side="left", fill="x", expand=True)
+        self.style_search.pack(fill="x", pady=(0, 3))
         self.style_search.insert(0, "Search styles...")
         self.style_search.configure(fg="#606060")
         self.style_search.bind("<FocusIn>", self.clear_style_placeholder)
@@ -292,9 +292,9 @@ class App:
         self.style_search.bind("<KeyRelease>", self.filter_title_styles)
         self.style_search.bind("<Return>", self.choose_first_style)
         self.title_style = ttk.Combobox(style_controls, values=self.title_styles,
-                                        state="readonly", height=18, width=19)
+                                        state="readonly", height=18)
         self.title_style.set("graffiti" if "graffiti" in self.title_styles else "sog95_block")
-        self.title_style.pack(side="right", fill="x", expand=True, padx=(7, 0))
+        self.title_style.pack(fill="x")
         self.title_style.bind("<<ComboboxSelected>>", lambda _e: self.refresh())
         self.info = self.field(form, "Information")
         self.explanation = self.field(form, "Explanation")
