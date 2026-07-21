@@ -22,6 +22,8 @@ It includes:
 - a dropdown containing more than 570 FIGlet/TAAG-style ASCII title fonts;
 - instant title-style searching and filtering by partial names such as `graff`, `callig`, or `slant`;
 - up to eight user-defined subtitle/divider boxes with optional content;
+- full mouse-wheel scrolling throughout the editor, including over divider inputs;
+- maximized windowed startup with the title bar and taskbar preserved;
 - middle-button drag panning and Shift+mouse-wheel horizontal scrolling in the preview.
 
 ## Download and use

@@ -232,6 +232,7 @@ class App:
         root.geometry("1120x720")
         root.minsize(850, 560)
         root.configure(bg=BG)
+        root.after(0, lambda: root.state("zoomed"))
 
         titlebar = tk.Frame(root, bg=BLUE, bd=2, relief="raised")
         titlebar.pack(fill="x", padx=4, pady=(4, 0))
@@ -261,12 +262,14 @@ class App:
         self.form_canvas.pack(side="left", fill="both", expand=True)
         left_scroll.configure(command=self.form_canvas.yview)
         form = tk.Frame(self.form_canvas, bg=BG)
+        self.form_container = form
         self.form_window = self.form_canvas.create_window((0, 0), window=form, anchor="nw")
         form.bind("<Configure>", lambda _e: self.form_canvas.configure(
             scrollregion=self.form_canvas.bbox("all")))
         self.form_canvas.bind("<Configure>", lambda e: self.form_canvas.itemconfigure(
             self.form_window, width=e.width))
         self.form_canvas.bind("<MouseWheel>", self.scroll_form)
+        self.root.bind_all("<MouseWheel>", self.route_mousewheel, add="+")
 
         tk.Label(form, text="Document fields", bg=BLUE, fg=WHITE,
                  font=("MS Sans Serif", 9, "bold"), anchor="w").pack(fill="x", padx=4, pady=4)
@@ -363,6 +366,18 @@ class App:
     def scroll_form(self, event):
         self.form_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
         return "break"
+
+    def route_mousewheel(self, event):
+        """Scroll the form even when the pointer is over an Entry/Text child."""
+        widget = self.root.winfo_containing(self.root.winfo_pointerx(),
+                                            self.root.winfo_pointery())
+        current = widget
+        while current is not None:
+            if current is self.form_container or current is self.form_canvas:
+                self.form_canvas.yview_scroll(-3 if event.delta > 0 else 3, "units")
+                return "break"
+            current = getattr(current, "master", None)
+        return None
 
     def add_custom_section(self):
         if len(self.custom_sections) >= 8:
