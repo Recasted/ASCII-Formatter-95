@@ -265,11 +265,16 @@ class App:
         self.form_container = form
         self.form_window = self.form_canvas.create_window((0, 0), window=form, anchor="nw")
         form.bind("<Configure>", lambda _e: self.form_canvas.configure(
-            scrollregion=self.form_canvas.bbox("all")))
-        self.form_canvas.bind("<Configure>", lambda e: self.form_canvas.itemconfigure(
-            self.form_window, width=e.width))
+            scrollregion=(0, 0, self.form_canvas.winfo_width(),
+                          max(self.form_canvas.winfo_height(), form.winfo_reqheight()))))
+        self.form_canvas.bind("<Configure>", lambda e: (
+            self.form_canvas.itemconfigure(self.form_window, width=e.width),
+            self.form_canvas.configure(scrollregion=(0, 0, e.width,
+                max(e.height, form.winfo_reqheight())))))
         self.form_canvas.bind("<MouseWheel>", self.scroll_form)
         self.root.bind_all("<MouseWheel>", self.route_mousewheel, add="+")
+        # Always open at the first field; extra space and scrolling belong below it.
+        self.root.after(100, lambda: self.form_canvas.yview_moveto(0))
 
         tk.Label(form, text="Document fields", bg=BLUE, fg=WHITE,
                  font=("MS Sans Serif", 9, "bold"), anchor="w").pack(fill="x", padx=4, pady=4)
@@ -282,19 +287,12 @@ class App:
         self.title_styles = ["sog95_block"] + fonts
         style_controls = tk.Frame(style_frame, bg=BG)
         style_controls.pack(fill="x")
-        self.style_search = tk.Entry(style_controls, relief="sunken", bd=2,
-                                     font=("MS Sans Serif", 8))
-        self.style_search.pack(fill="x", pady=(0, 3))
-        self.style_search.insert(0, "Search styles...")
-        self.style_search.configure(fg="#606060")
-        self.style_search.bind("<FocusIn>", self.clear_style_placeholder)
-        self.style_search.bind("<FocusOut>", self.restore_style_placeholder)
-        self.style_search.bind("<KeyRelease>", self.filter_title_styles)
-        self.style_search.bind("<Return>", self.choose_first_style)
         self.title_style = ttk.Combobox(style_controls, values=self.title_styles,
-                                        state="readonly", height=18)
+                                        state="normal", height=18)
         self.title_style.set("graffiti" if "graffiti" in self.title_styles else "sog95_block")
         self.title_style.pack(fill="x")
+        self.title_style.bind("<KeyRelease>", self.filter_title_styles)
+        self.title_style.bind("<Return>", self.choose_first_style)
         self.title_style.bind("<<ComboboxSelected>>", lambda _e: self.refresh())
         self.info = self.field(form, "Information")
         self.explanation = self.field(form, "Explanation")
@@ -428,38 +426,27 @@ class App:
         self.preview.scan_mark(event.x, event.y)
         return "break"
 
-    def clear_style_placeholder(self, _event):
-        if self.style_search.get() == "Search styles...":
-            self.style_search.delete(0, "end")
-            self.style_search.configure(fg=BLACK)
-
-    def restore_style_placeholder(self, _event):
-        if not self.style_search.get().strip():
-            self.style_search.insert(0, "Search styles...")
-            self.style_search.configure(fg="#606060")
-            self.title_style.configure(values=self.title_styles)
-
     def matching_styles(self):
-        query = self.style_search.get().strip().casefold()
-        if not query or query == "search styles...":
+        query = self.title_style.get().strip().casefold()
+        if not query:
             return self.title_styles
-        direct = [style for style in self.title_styles if query in style.casefold()]
+        search_query = query.replace("calli", "cali")
+        direct = [style for style in self.title_styles if search_query in style.casefold()]
         if direct:
             return sorted(direct, key=lambda style: (
-                style.casefold() != query,
-                not style.casefold().startswith(query),
+                style.casefold() != search_query,
+                not style.casefold().startswith(search_query),
                 style.casefold(),
             ))
         # Tolerate small spelling differences, e.g. "calligrafy" -> "caligraphy".
-        return get_close_matches(query, self.title_styles, n=30, cutoff=0.35)
+        return get_close_matches(search_query, self.title_styles, n=30, cutoff=0.35)
 
     def filter_title_styles(self, _event=None):
         matches = self.matching_styles()
         self.title_style.configure(values=matches)
-        query = self.style_search.get().strip().casefold()
+        query = self.title_style.get().strip().casefold()
         exact = next((style for style in matches if style.casefold() == query), None)
         if exact:
-            self.title_style.set(exact)
             self.refresh()
 
     def choose_first_style(self, _event=None):
