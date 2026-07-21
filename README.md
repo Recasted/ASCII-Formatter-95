@@ -30,6 +30,10 @@ Download `Sog95.exe`, open it, fill in the fields on the left, and use **Copy** 
 
 The formatter runs locally and contains no networking or tracking features.
 
+## Credits
+
+Created by [k1ck on Doxbin](https://doxbin.com/user/k1ck) / [@cartelleader on Telegram](https://t.me/cartelleader).
+
 ## Run from source
 
 Python 3 with Tkinter is required:
