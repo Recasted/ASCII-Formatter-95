@@ -20,6 +20,7 @@ It includes:
 - functional File, Edit, Format, and Help menus;
 - a SogSketch-inspired Windows 95/XP application icon.
 - a dropdown containing more than 570 FIGlet/TAAG-style ASCII title fonts;
+- instant title-style searching and filtering by partial names such as `graff`, `callig`, or `slant`;
 - middle-button drag panning and Shift+mouse-wheel horizontal scrolling in the preview.
 
 ## Download and use

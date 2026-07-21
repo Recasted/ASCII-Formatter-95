@@ -3,6 +3,7 @@ import re
 import sys
 import textwrap
 import tkinter as tk
+from difflib import get_close_matches
 from tkinter import filedialog, messagebox, ttk
 
 try:
@@ -255,10 +256,21 @@ class App:
         style_frame = tk.Frame(left, bg=BG)
         style_frame.pack(fill="x", padx=8, pady=(0, 4))
         tk.Label(style_frame, text="ASCII title style:", bg=BG, anchor="w",
-                 font=("MS Sans Serif", 8, "bold")).pack(side="left")
+                 font=("MS Sans Serif", 8, "bold")).pack(fill="x")
         fonts = sorted(FigletFont.getFonts(), key=str.casefold) if FigletFont else []
         self.title_styles = ["sog95_block"] + fonts
-        self.title_style = ttk.Combobox(style_frame, values=self.title_styles,
+        style_controls = tk.Frame(style_frame, bg=BG)
+        style_controls.pack(fill="x")
+        self.style_search = tk.Entry(style_controls, width=11, relief="sunken", bd=2,
+                                     font=("MS Sans Serif", 8))
+        self.style_search.pack(side="left", fill="x", expand=True)
+        self.style_search.insert(0, "Search styles...")
+        self.style_search.configure(fg="#606060")
+        self.style_search.bind("<FocusIn>", self.clear_style_placeholder)
+        self.style_search.bind("<FocusOut>", self.restore_style_placeholder)
+        self.style_search.bind("<KeyRelease>", self.filter_title_styles)
+        self.style_search.bind("<Return>", self.choose_first_style)
+        self.title_style = ttk.Combobox(style_controls, values=self.title_styles,
                                         state="readonly", height=18, width=19)
         self.title_style.set("graffiti" if "graffiti" in self.title_styles else "sog95_block")
         self.title_style.pack(side="right", fill="x", expand=True, padx=(7, 0))
@@ -324,6 +336,48 @@ class App:
     def start_pan(self, event):
         self.preview.configure(cursor="fleur")
         self.preview.scan_mark(event.x, event.y)
+        return "break"
+
+    def clear_style_placeholder(self, _event):
+        if self.style_search.get() == "Search styles...":
+            self.style_search.delete(0, "end")
+            self.style_search.configure(fg=BLACK)
+
+    def restore_style_placeholder(self, _event):
+        if not self.style_search.get().strip():
+            self.style_search.insert(0, "Search styles...")
+            self.style_search.configure(fg="#606060")
+            self.title_style.configure(values=self.title_styles)
+
+    def matching_styles(self):
+        query = self.style_search.get().strip().casefold()
+        if not query or query == "search styles...":
+            return self.title_styles
+        direct = [style for style in self.title_styles if query in style.casefold()]
+        if direct:
+            return sorted(direct, key=lambda style: (
+                style.casefold() != query,
+                not style.casefold().startswith(query),
+                style.casefold(),
+            ))
+        # Tolerate small spelling differences, e.g. "calligrafy" -> "caligraphy".
+        return get_close_matches(query, self.title_styles, n=30, cutoff=0.35)
+
+    def filter_title_styles(self, _event=None):
+        matches = self.matching_styles()
+        self.title_style.configure(values=matches)
+        query = self.style_search.get().strip().casefold()
+        exact = next((style for style in matches if style.casefold() == query), None)
+        if exact:
+            self.title_style.set(exact)
+            self.refresh()
+
+    def choose_first_style(self, _event=None):
+        matches = self.matching_styles()
+        if matches:
+            self.title_style.set(matches[0])
+            self.refresh()
+            self.status.configure(text=f"ASCII title style: {matches[0]}")
         return "break"
 
     def drag_pan(self, event):
