@@ -1,4 +1,6 @@
 import os
+import re
+import sys
 import textwrap
 import tkinter as tk
 from tkinter import filedialog, messagebox
@@ -48,37 +50,140 @@ FONT = {
     "8": [" 888 ", "8   8", " 888 ", "8   8", " 888 "],
     "9": [" 999 ", "9   9", " 9999", "    9", " 999 "],
     " ": ["   "] * 5,
+    "-": ["     ", "     ", "-----", "     ", "     "],
 }
 
 
 def ascii_title(value):
-    value = "".join(c for c in value.upper() if c in FONT)[:16] or "UNTITLED"
+    value = value.strip().upper() or "UNTITLED"
+    supported = "".join(c for c in value if c in FONT)
+    if supported != value:
+        value = supported or "UNTITLED"
     return "\n".join(" ".join(FONT[c][row] for c in value).rstrip() for row in range(5))
 
 
-def make_document(title, info, explanation, reason, width=82):
-    inner = width - 4
-    def centered(value=""):
-        return f"| {value[:inner].center(inner)} |"
-    def body(value):
-        value = value.strip() or "(none provided)"
-        lines = []
-        for paragraph in value.splitlines() or [""]:
-            wrapped = textwrap.wrap(paragraph, inner, replace_whitespace=False) or [""]
-            lines.extend(f"| {line.ljust(inner)} |" for line in wrapped)
-        return lines
-    border = "+" + "-" * (width - 2) + "+"
-    rule = "+" + "=" * (width - 2) + "+"
-    art = ascii_title(title)
-    lines = [border]
-    for line in art.splitlines():
-        lines.append(centered(line))
-    lines += [rule]
-    for label, value in (("INFORMATION", info), ("EXPLANATION", explanation), ("REASON", reason)):
-        lines += [centered(f"[ {label} ]"), centered()]
-        lines += body(value)
-        lines += [centered(), rule]
-    lines += [centered("Generated with ASCII Formatter 95"), border]
+def _tree_items(value):
+    """Turn free-form lines into stable, readable tree entries."""
+    pairs, plain = [], []
+    for raw in value.splitlines():
+        line = raw.strip().lstrip("-*• ").strip()
+        if not line:
+            continue
+        if ":" in line:
+            key, val = line.split(":", 1)
+            if key.strip() and val.strip():
+                pairs.append((key.strip(), val.strip()))
+                continue
+        plain.append(line)
+    pairs.sort(key=lambda item: item[0].casefold())
+    return [(key, val) for key, val in pairs] + [("", line) for line in plain]
+
+
+def _classify_information(value):
+    """Classify input lines by their content without sending data anywhere."""
+    buckets = {}
+    patterns = (
+        ("PASSWORDS / CREDENTIALS", re.compile(r"\b(pass(?:word|code)?|pwd|credential|login|token|secret|pin)\b", re.I)),
+        ("EMAIL ADDRESSES", re.compile(r"[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}")),
+        ("IP ADDRESSES", re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[0-9a-f]{0,4}:[0-9a-f:]+\b", re.I)),
+        ("WEB LINKS / DOMAINS", re.compile(r"\b(?:https?://|www\.|[\w-]+\.(?:com|net|org|io|dev|gg|co|nl)\b)", re.I)),
+        ("PHONE NUMBERS", re.compile(r"(?:\+?\d[\d ()-]{7,}\d)")),
+        ("FINANCIAL INFORMATION", re.compile(r"\b(bank|iban|swift|routing|card|credit|debit|payment|mortgage|balance|\$|€|£)\b", re.I)),
+        ("LOCATIONS / ADDRESSES", re.compile(r"\b(address|street|road|avenue|city|state|country|postal|postcode|zip|location|coordinates?)\b", re.I)),
+        ("ACCOUNTS / USERNAMES", re.compile(r"\b(account|username|user name|alias|handle|profile|discord|telegram|instagram|twitter|github)\b", re.I)),
+        ("DATES / TIMELINE", re.compile(r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2}|date|born|birthday|created|updated)\b", re.I)),
+        ("IDENTITY / PERSONAL", re.compile(r"\b(name|age|gender|pronouns?|occupation|school|employer|family|mother|father|sister|brother)\b", re.I)),
+        ("DEVICES / SYSTEM", re.compile(r"\b(device|computer|windows|linux|mac|android|iphone|hostname|browser|operating system|hardware)\b", re.I)),
+    )
+    for raw in value.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        category = "OTHER INFORMATION"
+        for label, pattern in patterns:
+            if pattern.search(line):
+                category = label
+                break
+        buckets.setdefault(category, []).append(line)
+    if not buckets:
+        buckets["OTHER INFORMATION"] = ["(none provided)"]
+    order = [label for label, _ in patterns] + ["OTHER INFORMATION"]
+    return [(label, "\n".join(buckets[label])) for label in order if label in buckets]
+
+
+def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=True):
+    art_lines = ascii_title(title).splitlines()
+    sections = _classify_information(info)
+    brief_items = []
+    if explanation.strip():
+        brief_items.append(("Explanation", explanation.strip()))
+    if reason.strip():
+        brief_items.append(("Reason", reason.strip()))
+    if not brief_items:
+        brief_items.append(("Brief", "(none provided)"))
+
+    raw_lines = [line.strip() for _, value in sections + brief_items for line in value.splitlines() if line.strip()]
+    longest_input = max([len(line) + 12 for line in raw_lines] or [0])
+    required = max([len(line) for line in art_lines] + [len(title) + 12, longest_input, 82])
+    inner = max(64, int(minimum_width), required if auto_fit else 0)
+
+    def content(value="", align="left"):
+        value = value[:inner]
+        padded = value.center(inner) if align == "center" else value.ljust(inner)
+        return f"-(║)- {padded} -(║)-"
+
+    def divider(char="═"):
+        filler = inner + 5
+        left = (filler + 1) // 2
+        right = filler - left
+        return f"-(╠{char * left}&{char * right}╣)-"
+
+    def tree(value):
+        items = _tree_items(value)
+        output = []
+        for index, (key, val) in enumerate(items):
+            last = index == len(items) - 1
+            branch = "└──" if last else "├──"
+            continuation = "   " if last else "│  "
+            if key:
+                output.append(content(f"{branch} {key}"))
+                wrapped = textwrap.wrap(val, max(20, inner - 7), replace_whitespace=False) or [""]
+                for part_index, part in enumerate(wrapped):
+                    twig = "└─" if part_index == len(wrapped) - 1 else "├─"
+                    output.append(content(f"{continuation} {twig} {part}"))
+            else:
+                wrapped = textwrap.wrap(val, max(20, inner - 5), replace_whitespace=False) or [""]
+                for part_index, part in enumerate(wrapped):
+                    mark = branch if part_index == 0 else continuation + "  "
+                    output.append(content(f"{mark} {part}"))
+        return output
+
+    lines = [divider()]
+    for line in art_lines:
+        lines.append(content(line, "center"))
+    lines += [content(), divider(), content("BRIEF // EXPLANATION & REASON", "center"), content()]
+    for index, (label, value) in enumerate(brief_items):
+        last = index == len(brief_items) - 1
+        branch = "└──" if last else "├──"
+        continuation = "   " if last else "│  "
+        lines.append(content(f"{branch} {label}"))
+        wrapped = textwrap.wrap(value, max(20, inner - 7), replace_whitespace=False) or [""]
+        for part_index, part in enumerate(wrapped):
+            twig = "└─" if part_index == len(wrapped) - 1 else "├─"
+            lines.append(content(f"{continuation} {twig} {part}"))
+    lines += [content(), divider(), content("AUTOMATIC INFORMATION INDEX", "center"), content()]
+    for index, (label, _) in enumerate(sections, 1):
+        connector = "└──" if index == len(sections) else "├──"
+        lines.append(content(f"{connector} {index:02d}. {label.title()}"))
+    lines += [content(), divider()]
+
+    for index, (label, value) in enumerate(sections, 1):
+        lines += [content(f"[ {index:02d} // {label} ]", "center"), content()]
+        lines += tree(value)
+        lines += [content(), divider()]
+    lines += [content("Generated by Sog95", "center"),
+              content("Created by https://doxbin.com/user/k1ck / https://t.me/cartelleader", "center"),
+              divider()]
     return "\n".join(lines)
 
 
@@ -92,7 +197,14 @@ class RaisedButton(tk.Button):
 class App:
     def __init__(self, root):
         self.root = root
+        self.auto_fit = tk.BooleanVar(value=True)
         root.title("ASCII Formatter 95")
+        icon_path = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), "ascii_formatter_95.ico")
+        if os.path.exists(icon_path):
+            try:
+                root.iconbitmap(icon_path)
+            except tk.TclError:
+                pass
         root.geometry("1120x720")
         root.minsize(850, 560)
         root.configure(bg=BG)
@@ -101,12 +213,15 @@ class App:
         titlebar.pack(fill="x", padx=4, pady=(4, 0))
         tk.Label(titlebar, text="▣  ASCII Formatter 95", bg=BLUE, fg=WHITE,
                  font=("MS Sans Serif", 10, "bold"), anchor="w").pack(side="left", fill="x", expand=True, padx=5, pady=3)
-        tk.Label(titlebar, text="?", width=3, bg=BG, relief="raised", bd=2).pack(side="right", padx=2, pady=2)
+        tk.Button(titlebar, text="?", width=3, bg=BG, relief="raised", bd=2,
+                  command=self.about).pack(side="right", padx=2, pady=2)
 
         toolbar = tk.Frame(root, bg=BG, bd=2, relief="raised")
         toolbar.pack(fill="x", padx=4)
-        for text in ("File", "Edit", "Format", "Help"):
-            tk.Label(toolbar, text=text, bg=BG, padx=8, pady=3).pack(side="left")
+        self.add_menu(toolbar, "File", (("Export...", self.export), (None, None), ("Exit", root.destroy)))
+        self.add_menu(toolbar, "Edit", (("Copy all", self.copy), ("Clear fields", self.clear)))
+        self.add_menu(toolbar, "Format", (("Auto-fit width", self.toggle_auto_fit, "check"),))
+        self.add_menu(toolbar, "Help", (("About ASCII Formatter 95", self.about),))
 
         main = tk.PanedWindow(root, orient="horizontal", bg=BG, sashwidth=7, bd=2, relief="sunken")
         main.pack(fill="both", expand=True, padx=7, pady=7)
@@ -124,14 +239,15 @@ class App:
 
         options = tk.LabelFrame(left, text="Options", bg=BG, font=("MS Sans Serif", 9))
         options.pack(fill="x", padx=8, pady=6)
-        tk.Label(options, text="Output width:", bg=BG).pack(side="left", padx=5, pady=6)
-        self.width = tk.Spinbox(options, from_=64, to=120, width=5, relief="sunken", bd=2, command=self.refresh)
+        tk.Label(options, text="Minimum width:", bg=BG).pack(side="left", padx=5, pady=6)
+        self.width = tk.Spinbox(options, from_=64, to=9999, width=5, relief="sunken", bd=2, command=self.refresh)
         self.width.delete(0, "end"); self.width.insert(0, "82")
         self.width.pack(side="left")
+        tk.Checkbutton(options, text="Auto-fit", variable=self.auto_fit, bg=BG,
+                       activebackground=BG, command=self.refresh).pack(side="left", padx=7)
 
         buttons = tk.Frame(left, bg=BG)
         buttons.pack(fill="x", padx=7, pady=7)
-        RaisedButton(buttons, text="Preview", command=self.refresh).pack(side="left", padx=2)
         RaisedButton(buttons, text="Copy", command=self.copy).pack(side="left", padx=2)
         RaisedButton(buttons, text="Export...", command=self.export).pack(side="left", padx=2)
 
@@ -155,6 +271,37 @@ class App:
             widget.bind("<KeyRelease>", lambda _e: self.refresh())
         self.refresh()
 
+    def add_menu(self, parent, label, commands):
+        button = tk.Menubutton(parent, text=label, bg=BG, activebackground=BLUE,
+                               activeforeground=WHITE, relief="flat", padx=8, pady=3)
+        menu = tk.Menu(button, tearoff=False, bg=BG, activebackground=BLUE,
+                       activeforeground=WHITE, relief="raised", bd=2)
+        for item in commands:
+            if item[0] is None:
+                menu.add_separator()
+            elif len(item) > 2 and item[2] == "check":
+                menu.add_checkbutton(label=item[0], variable=self.auto_fit,
+                                     command=self.refresh)
+            else:
+                menu.add_command(label=item[0], command=item[1])
+        button.configure(menu=menu)
+        button.pack(side="left")
+
+    def toggle_auto_fit(self):
+        self.auto_fit.set(not self.auto_fit.get())
+        self.refresh()
+
+    def clear(self):
+        self.title.delete(0, "end")
+        for widget in (self.info, self.explanation, self.reason):
+            widget.delete("1.0", "end")
+        self.refresh()
+        self.status.configure(text="All fields cleared")
+
+    def about(self):
+        messagebox.showinfo("About ASCII Formatter 95",
+                            "ASCII Formatter 95\n\nA local, offline formatter with automatic sections, ASCII trees, live preview, copying, and text export.")
+
     def field(self, parent, label, one_line=False):
         frame = tk.Frame(parent, bg=BG)
         frame.pack(fill="x", padx=8, pady=4)
@@ -172,10 +319,11 @@ class App:
         return widget.get() if isinstance(widget, tk.Entry) else widget.get("1.0", "end-1c")
 
     def result(self):
-        try: width = max(64, min(120, int(self.width.get())))
+        try: width = max(64, int(self.width.get()))
         except ValueError: width = 82
         return make_document(self.value(self.title), self.value(self.info),
-                             self.value(self.explanation), self.value(self.reason), width)
+                             self.value(self.explanation), self.value(self.reason),
+                             width, self.auto_fit.get())
 
     def refresh(self):
         self.preview.configure(state="normal")

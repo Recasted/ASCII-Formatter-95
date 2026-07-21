@@ -7,11 +7,18 @@ It includes:
 - a Windows 95-inspired interface;
 - separate fields for a title, information, explanation, and reason;
 - an automatically generated ASCII-art title;
-- boxed sections with consistent spacing and line wrapping;
+- automatic width expansion for long titles and unbroken input lines;
+- a generated table of contents for every populated section;
+- alphabetically sorted `Name: value` entries shown as ASCII tree branches;
+- a combined Explanation/Reason brief placed above all information;
+- local automatic classification into IP addresses, email addresses, credentials, accounts, links, phone numbers, locations, dates, identity details, devices, financial information, and uncategorized information;
+- heavy `╠═`, `║`, and `╣` box-tree borders with consistent spacing;
 - a live full-document preview;
 - one-click copying to the clipboard;
 - export to a UTF-8 `.txt` file;
 - adjustable output width.
+- functional File, Edit, Format, and Help menus;
+- a SogSketch-inspired Windows 95/XP application icon.
 
 ## Download and use
 
