@@ -128,9 +128,14 @@ def _classify_information(value):
 
 
 def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=True,
-                  title_style="graffiti"):
+                  title_style="graffiti", additional_sections=None):
     art_lines = ascii_title(title, title_style).splitlines()
-    sections = _classify_information(info)
+    custom_sections = [
+        ((label.strip() or "UNTITLED DIVIDER").upper(), body.strip())
+        for label, body in (additional_sections or [])
+        if label.strip() or body.strip()
+    ]
+    sections = custom_sections + _classify_information(info)
     brief_items = []
     if explanation.strip():
         brief_items.append(("Explanation", explanation.strip()))
@@ -139,9 +144,8 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
     if not brief_items:
         brief_items.append(("Brief", "(none provided)"))
 
-    raw_lines = [line.strip() for _, value in sections + brief_items for line in value.splitlines() if line.strip()]
-    longest_input = max([len(line) + 12 for line in raw_lines] or [0])
-    required = max([len(line) for line in art_lines] + [len(title) + 12, longest_input, 82])
+    # The title canvas dictates auto-fit width. Body text always wraps inside it.
+    required = max([len(line) for line in art_lines] + [len(title) + 12, 82])
     inner = max(64, int(minimum_width), required if auto_fit else 0)
 
     def content(value="", align="left"):
@@ -250,10 +254,24 @@ class App:
         main.add(left, minsize=270)
         main.add(right, minsize=500)
 
-        tk.Label(left, text="Document fields", bg=BLUE, fg=WHITE,
+        left_scroll = tk.Scrollbar(left, orient="vertical")
+        left_scroll.pack(side="right", fill="y")
+        self.form_canvas = tk.Canvas(left, bg=BG, highlightthickness=0,
+                                     yscrollcommand=left_scroll.set)
+        self.form_canvas.pack(side="left", fill="both", expand=True)
+        left_scroll.configure(command=self.form_canvas.yview)
+        form = tk.Frame(self.form_canvas, bg=BG)
+        self.form_window = self.form_canvas.create_window((0, 0), window=form, anchor="nw")
+        form.bind("<Configure>", lambda _e: self.form_canvas.configure(
+            scrollregion=self.form_canvas.bbox("all")))
+        self.form_canvas.bind("<Configure>", lambda e: self.form_canvas.itemconfigure(
+            self.form_window, width=e.width))
+        self.form_canvas.bind("<MouseWheel>", self.scroll_form)
+
+        tk.Label(form, text="Document fields", bg=BLUE, fg=WHITE,
                  font=("MS Sans Serif", 9, "bold"), anchor="w").pack(fill="x", padx=4, pady=4)
-        self.title = self.field(left, "Title", one_line=True)
-        style_frame = tk.Frame(left, bg=BG)
+        self.title = self.field(form, "Title", one_line=True)
+        style_frame = tk.Frame(form, bg=BG)
         style_frame.pack(fill="x", padx=8, pady=(0, 4))
         tk.Label(style_frame, text="ASCII title style:", bg=BG, anchor="w",
                  font=("MS Sans Serif", 8, "bold")).pack(fill="x")
@@ -275,11 +293,20 @@ class App:
         self.title_style.set("graffiti" if "graffiti" in self.title_styles else "sog95_block")
         self.title_style.pack(side="right", fill="x", expand=True, padx=(7, 0))
         self.title_style.bind("<<ComboboxSelected>>", lambda _e: self.refresh())
-        self.info = self.field(left, "Information")
-        self.explanation = self.field(left, "Explanation")
-        self.reason = self.field(left, "Reason")
+        self.info = self.field(form, "Information")
+        self.explanation = self.field(form, "Explanation")
+        self.reason = self.field(form, "Reason")
 
-        options = tk.LabelFrame(left, text="Options", bg=BG, font=("MS Sans Serif", 9))
+        self.custom_sections = []
+        self.extra_area = tk.LabelFrame(form, text="Subtitle / divider boxes (0 / 8)",
+                                        bg=BG, font=("MS Sans Serif", 9))
+        self.extra_area.pack(fill="x", padx=8, pady=(6, 2))
+        self.extra_list = tk.Frame(self.extra_area, bg=BG)
+        self.extra_list.pack(fill="x", padx=4, pady=(3, 0))
+        RaisedButton(self.extra_area, text="+ Add subtitle / divider",
+                     command=self.add_custom_section).pack(fill="x", padx=4, pady=5)
+
+        options = tk.LabelFrame(form, text="Options", bg=BG, font=("MS Sans Serif", 9))
         options.pack(fill="x", padx=8, pady=6)
         tk.Label(options, text="Minimum width:", bg=BG).pack(side="left", padx=5, pady=6)
         self.width = tk.Spinbox(options, from_=64, to=9999, width=5, relief="sunken", bd=2, command=self.refresh)
@@ -288,7 +315,7 @@ class App:
         tk.Checkbutton(options, text="Auto-fit", variable=self.auto_fit, bg=BG,
                        activebackground=BG, command=self.refresh).pack(side="left", padx=7)
 
-        buttons = tk.Frame(left, bg=BG)
+        buttons = tk.Frame(form, bg=BG)
         buttons.pack(fill="x", padx=7, pady=7)
         RaisedButton(buttons, text="Copy", command=self.copy).pack(side="left", padx=2)
         RaisedButton(buttons, text="Export...", command=self.export).pack(side="left", padx=2)
@@ -332,6 +359,54 @@ class App:
                 menu.add_command(label=item[0], command=item[1])
         button.configure(menu=menu)
         button.pack(side="left")
+
+    def scroll_form(self, event):
+        self.form_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        return "break"
+
+    def add_custom_section(self):
+        if len(self.custom_sections) >= 8:
+            self.status.configure(text="Maximum of 8 subtitle / divider boxes reached")
+            return
+        number = len(self.custom_sections) + 1
+        card = tk.Frame(self.extra_list, bg="#d4d4d4", bd=2, relief="groove")
+        card.pack(fill="x", pady=3)
+        header = tk.Frame(card, bg=BLUE)
+        header.pack(fill="x")
+        tk.Label(header, text=f" Divider {number} ", bg=BLUE, fg=WHITE,
+                 font=("MS Sans Serif", 8, "bold")).pack(side="left")
+        remove = tk.Button(header, text="×", width=2, bg=BG, bd=1,
+                           command=lambda: self.remove_custom_section(card))
+        remove.pack(side="right")
+        tk.Label(card, text="Section title:", bg="#d4d4d4", anchor="w").pack(fill="x", padx=5, pady=(4, 0))
+        title = tk.Entry(card, relief="sunken", bd=2, font=("MS Sans Serif", 8))
+        title.insert(0, f"Additional section {number}")
+        title.pack(fill="x", padx=5)
+        tk.Label(card, text="Content (optional for divider-only):", bg="#d4d4d4", anchor="w").pack(fill="x", padx=5, pady=(4, 0))
+        body = tk.Text(card, height=3, wrap="word", relief="sunken", bd=2,
+                       font=("MS Sans Serif", 8))
+        body.pack(fill="x", padx=5, pady=(0, 5))
+        title.bind("<KeyRelease>", lambda _e: self.refresh())
+        body.bind("<KeyRelease>", lambda _e: self.refresh())
+        self.custom_sections.append({"frame": card, "title": title, "body": body})
+        self.update_extra_label()
+        self.refresh()
+        self.root.after_idle(lambda: self.form_canvas.yview_moveto(1.0))
+
+    def remove_custom_section(self, card):
+        match = next((item for item in self.custom_sections if item["frame"] is card), None)
+        if match:
+            self.custom_sections.remove(match)
+            card.destroy()
+            self.update_extra_label()
+            self.refresh()
+
+    def update_extra_label(self):
+        self.extra_area.configure(text=f"Subtitle / divider boxes ({len(self.custom_sections)} / 8)")
+
+    def custom_section_values(self):
+        return [(self.value(item["title"]), self.value(item["body"]))
+                for item in self.custom_sections]
 
     def start_pan(self, event):
         self.preview.configure(cursor="fleur")
@@ -401,6 +476,10 @@ class App:
         self.title.delete(0, "end")
         for widget in (self.info, self.explanation, self.reason):
             widget.delete("1.0", "end")
+        for item in list(self.custom_sections):
+            item["frame"].destroy()
+        self.custom_sections.clear()
+        self.update_extra_label()
         self.refresh()
         self.status.configure(text="All fields cleared")
 
@@ -429,7 +508,8 @@ class App:
         except ValueError: width = 82
         return make_document(self.value(self.title), self.value(self.info),
                              self.value(self.explanation), self.value(self.reason),
-                             width, self.auto_fit.get(), self.title_style.get())
+                             width, self.auto_fit.get(), self.title_style.get(),
+                             self.custom_section_values())
 
     def refresh(self):
         self.preview.configure(state="normal")

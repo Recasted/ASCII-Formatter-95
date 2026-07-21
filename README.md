@@ -7,7 +7,7 @@ It includes:
 - a Windows 95-inspired interface;
 - separate fields for a title, information, explanation, and reason;
 - an automatically generated ASCII-art title;
-- automatic width expansion for long titles and unbroken input lines;
+- title-controlled report width: long body text wraps instead of stretching the document;
 - a generated table of contents for every populated section;
 - alphabetically sorted `Name: value` entries shown as ASCII tree branches;
 - a combined Explanation/Reason brief placed above all information;
@@ -21,6 +21,7 @@ It includes:
 - a SogSketch-inspired Windows 95/XP application icon.
 - a dropdown containing more than 570 FIGlet/TAAG-style ASCII title fonts;
 - instant title-style searching and filtering by partial names such as `graff`, `callig`, or `slant`;
+- up to eight user-defined subtitle/divider boxes with optional content;
 - middle-button drag panning and Shift+mouse-wheel horizontal scrolling in the preview.
 
 ## Download and use
