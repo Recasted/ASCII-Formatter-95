@@ -175,8 +175,11 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
         return output
 
     lines = [divider()]
+    art_width = max(len(line) for line in art_lines)
     for line in art_lines:
-        lines.append(content(line, "center"))
+        # Center the complete FIGlet canvas, not each row independently.
+        # Individual row centering makes shorter lower strokes drift right.
+        lines.append(content(line.ljust(art_width), "center"))
     lines += [content(), divider(), content("BRIEF // EXPLANATION & REASON", "center"), content()]
     for index, (label, value) in enumerate(brief_items):
         last = index == len(brief_items) - 1
