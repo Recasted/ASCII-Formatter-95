@@ -3,7 +3,12 @@ import re
 import sys
 import textwrap
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, ttk
+
+try:
+    from pyfiglet import Figlet, FigletFont
+except ImportError:
+    Figlet = FigletFont = None
 
 
 BG = "#c0c0c0"
@@ -54,8 +59,18 @@ FONT = {
 }
 
 
-def ascii_title(value):
+def ascii_title(value, style="graffiti"):
     value = value.strip().upper() or "UNTITLED"
+    if Figlet is not None and style != "sog95_block":
+        try:
+            rendered = Figlet(font=style, width=10000).renderText(value)
+            lines = [line.rstrip() for line in rendered.splitlines()]
+            while lines and not lines[-1]:
+                lines.pop()
+            if lines:
+                return "\n".join(lines)
+        except Exception:
+            pass
     supported = "".join(c for c in value if c in FONT)
     if supported != value:
         value = supported or "UNTITLED"
@@ -111,8 +126,9 @@ def _classify_information(value):
     return [(label, "\n".join(buckets[label])) for label in order if label in buckets]
 
 
-def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=True):
-    art_lines = ascii_title(title).splitlines()
+def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=True,
+                  title_style="graffiti"):
+    art_lines = ascii_title(title, title_style).splitlines()
     sections = _classify_information(info)
     brief_items = []
     if explanation.strip():
@@ -233,6 +249,17 @@ class App:
         tk.Label(left, text="Document fields", bg=BLUE, fg=WHITE,
                  font=("MS Sans Serif", 9, "bold"), anchor="w").pack(fill="x", padx=4, pady=4)
         self.title = self.field(left, "Title", one_line=True)
+        style_frame = tk.Frame(left, bg=BG)
+        style_frame.pack(fill="x", padx=8, pady=(0, 4))
+        tk.Label(style_frame, text="ASCII title style:", bg=BG, anchor="w",
+                 font=("MS Sans Serif", 8, "bold")).pack(side="left")
+        fonts = sorted(FigletFont.getFonts(), key=str.casefold) if FigletFont else []
+        self.title_styles = ["sog95_block"] + fonts
+        self.title_style = ttk.Combobox(style_frame, values=self.title_styles,
+                                        state="readonly", height=18, width=19)
+        self.title_style.set("graffiti" if "graffiti" in self.title_styles else "sog95_block")
+        self.title_style.pack(side="right", fill="x", expand=True, padx=(7, 0))
+        self.title_style.bind("<<ComboboxSelected>>", lambda _e: self.refresh())
         self.info = self.field(left, "Information")
         self.explanation = self.field(left, "Explanation")
         self.reason = self.field(left, "Reason")
@@ -263,6 +290,10 @@ class App:
         self.preview.grid(row=0, column=0, sticky="nsew")
         y.grid(row=0, column=1, sticky="ns"); x.grid(row=1, column=0, sticky="ew")
         preview_frame.grid_rowconfigure(0, weight=1); preview_frame.grid_columnconfigure(0, weight=1)
+        self.preview.bind("<ButtonPress-2>", self.start_pan)
+        self.preview.bind("<B2-Motion>", self.drag_pan)
+        self.preview.bind("<ButtonRelease-2>", self.end_pan)
+        self.preview.bind("<Shift-MouseWheel>", self.horizontal_wheel)
 
         self.status = tk.Label(root, text="Ready", bg=BG, bd=2, relief="sunken", anchor="w")
         self.status.pack(fill="x", padx=5, pady=(0, 5))
@@ -286,6 +317,24 @@ class App:
                 menu.add_command(label=item[0], command=item[1])
         button.configure(menu=menu)
         button.pack(side="left")
+
+    def start_pan(self, event):
+        self.preview.configure(cursor="fleur")
+        self.preview.scan_mark(event.x, event.y)
+        return "break"
+
+    def drag_pan(self, event):
+        self.preview.scan_dragto(event.x, event.y, gain=1)
+        return "break"
+
+    def end_pan(self, _event):
+        self.preview.configure(cursor="xterm")
+        return "break"
+
+    def horizontal_wheel(self, event):
+        direction = -1 if event.delta > 0 else 1
+        self.preview.xview_scroll(direction * 4, "units")
+        return "break"
 
     def toggle_auto_fit(self):
         self.auto_fit.set(not self.auto_fit.get())
@@ -323,7 +372,7 @@ class App:
         except ValueError: width = 82
         return make_document(self.value(self.title), self.value(self.info),
                              self.value(self.explanation), self.value(self.reason),
-                             width, self.auto_fit.get())
+                             width, self.auto_fit.get(), self.title_style.get())
 
     def refresh(self):
         self.preview.configure(state="normal")

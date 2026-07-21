@@ -19,6 +19,8 @@ It includes:
 - adjustable output width.
 - functional File, Edit, Format, and Help menus;
 - a SogSketch-inspired Windows 95/XP application icon.
+- a dropdown containing more than 570 FIGlet/TAAG-style ASCII title fonts;
+- middle-button drag panning and Shift+mouse-wheel horizontal scrolling in the preview.
 
 ## Download and use
 
@@ -33,6 +35,8 @@ Python 3 with Tkinter is required:
 ```powershell
 python ascii_formatter.py
 ```
+
+Install the title-font dependency first with `python -m pip install pyfiglet`.
 
 ## Build the executable
 
