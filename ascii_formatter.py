@@ -324,8 +324,22 @@ class App:
         RaisedButton(buttons, text="Copy", command=self.copy).pack(side="left", padx=2)
         RaisedButton(buttons, text="Export...", command=self.export).pack(side="left", padx=2)
 
-        tk.Label(right, text="Full generated file preview", bg=BLUE, fg=WHITE,
-                 font=("MS Sans Serif", 9, "bold"), anchor="w").pack(fill="x", padx=4, pady=4)
+        preview_header = tk.Frame(right, bg=BLUE, bd=1, relief="raised")
+        preview_header.pack(fill="x", padx=4, pady=4)
+        tk.Label(preview_header, text="Full generated file preview", bg=BLUE, fg=WHITE,
+                 font=("MS Sans Serif", 9, "bold"), anchor="w").pack(
+                     side="left", fill="x", expand=True, padx=4)
+        self.preview_font_size = 9
+        self.preview_zoom_label = tk.Label(preview_header, text="100%", width=5,
+                                           bg=BLUE, fg=WHITE,
+                                           font=("MS Sans Serif", 8, "bold"))
+        self.preview_zoom_label.pack(side="right", padx=(2, 3))
+        tk.Button(preview_header, text="+", width=2, bg=BG, relief="raised", bd=2,
+                  font=("MS Sans Serif", 8, "bold"), command=lambda: self.zoom_preview(1)).pack(
+                      side="right", padx=1, pady=1)
+        tk.Button(preview_header, text="−", width=2, bg=BG, relief="raised", bd=2,
+                  font=("MS Sans Serif", 8, "bold"), command=lambda: self.zoom_preview(-1)).pack(
+                      side="right", padx=1, pady=1)
         preview_frame = tk.Frame(right, bg=BG, bd=2, relief="sunken")
         preview_frame.pack(fill="both", expand=True, padx=7, pady=(0, 7))
         self.preview = tk.Text(preview_frame, wrap="none", bg=WHITE, fg=BLACK,
@@ -340,6 +354,7 @@ class App:
         self.preview.bind("<B2-Motion>", self.drag_pan)
         self.preview.bind("<ButtonRelease-2>", self.end_pan)
         self.preview.bind("<Shift-MouseWheel>", self.horizontal_wheel)
+        self.preview.bind("<Control-MouseWheel>", self.control_zoom_preview)
 
         self.status = tk.Label(root, text="Ready", bg=BG, bd=2, relief="sunken", anchor="w")
         self.status.pack(fill="x", padx=5, pady=(0, 5))
@@ -366,6 +381,17 @@ class App:
 
     def scroll_form(self, event):
         self.form_canvas.yview_scroll(-1 if event.delta > 0 else 1, "units")
+        return "break"
+
+    def zoom_preview(self, direction):
+        self.preview_font_size = max(6, min(28, self.preview_font_size + direction))
+        self.preview.configure(font=("Consolas", self.preview_font_size))
+        percent = round(self.preview_font_size / 9 * 100)
+        self.preview_zoom_label.configure(text=f"{percent}%")
+        self.status.configure(text=f"Preview zoom: {percent}%")
+
+    def control_zoom_preview(self, event):
+        self.zoom_preview(1 if event.delta > 0 else -1)
         return "break"
 
     def route_mousewheel(self, event):
