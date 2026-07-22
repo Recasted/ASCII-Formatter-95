@@ -80,19 +80,37 @@ def ascii_title(value, style="graffiti"):
 
 def _tree_items(value):
     """Turn free-form lines into stable, readable tree entries."""
-    pairs, plain = [], []
+    items = []
+    current_key = None
+    current_values = []
+
+    def flush_group():
+        nonlocal current_key, current_values
+        if current_key is not None:
+            items.append((current_key, "\n".join(current_values)))
+        current_key = None
+        current_values = []
+
     for raw in value.splitlines():
         line = raw.strip().lstrip("-*• ").strip()
         if not line:
             continue
+        if line.endswith(":") and line[:-1].strip():
+            flush_group()
+            current_key = line[:-1].strip()
+            continue
         if ":" in line:
             key, val = line.split(":", 1)
             if key.strip() and val.strip():
-                pairs.append((key.strip(), val.strip()))
+                flush_group()
+                items.append((key.strip(), val.strip()))
                 continue
-        plain.append(line)
-    pairs.sort(key=lambda item: item[0].casefold())
-    return [(key, val) for key, val in pairs] + [("", line) for line in plain]
+        if current_key is not None:
+            current_values.append(line)
+        else:
+            items.append(("", line))
+    flush_group()
+    return items
 
 
 def _classify_information(value):
@@ -177,14 +195,19 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
             continuation = "   " if last else "│  "
             if key:
                 output.append(content(f"{branch} {key}"))
-                wrapped = wrapped_lines(val, max(20, inner - 7))
-                for part_index, part in enumerate(wrapped):
-                    twig = "└─" if part_index == len(wrapped) - 1 else "├─"
-                    output.append(content(f"{continuation} {twig} {part}"))
+                children = val.splitlines() or ["(none provided)"]
+                for child in children:
+                    wrapped = wrapped_lines(child, max(20, inner - 10))
+                    for part in wrapped:
+                        output.append(content(f"{continuation}    {part}"))
             else:
                 wrapped = wrapped_lines(val, max(20, inner - 5))
+                is_sentence = val.rstrip().endswith((".", "!", "?")) or len(val) > 60
                 for part_index, part in enumerate(wrapped):
-                    mark = branch if part_index == 0 else continuation + "  "
+                    if is_sentence:
+                        mark = "    "
+                    else:
+                        mark = branch if part_index == 0 else continuation + "  "
                     output.append(content(f"{mark} {part}"))
         return output
 
