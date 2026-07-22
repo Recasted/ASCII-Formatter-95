@@ -87,13 +87,17 @@ def _tree_items(value):
     def flush_group():
         nonlocal current_key, current_values
         if current_key is not None:
-            items.append((current_key, "\n".join(current_values)))
+            items.append((current_key, "\n".join(current_values), False))
         current_key = None
         current_values = []
 
     for raw in value.splitlines():
         line = raw.strip().lstrip("-*• ").strip()
         if not line:
+            if current_key is not None:
+                current_values.append("")
+            elif not items or items[-1] != ("", "", False):
+                items.append(("", "", False))
             continue
         if line.endswith(":") and line[:-1].strip():
             flush_group()
@@ -103,12 +107,12 @@ def _tree_items(value):
             key, val = line.split(":", 1)
             if key.strip() and val.strip():
                 flush_group()
-                items.append((key.strip(), val.strip()))
+                items.append((key.strip(), val.strip(), True))
                 continue
         if current_key is not None:
             current_values.append(line)
         else:
-            items.append(("", line))
+            items.append(("", line, False))
     flush_group()
     return items
 
@@ -189,26 +193,46 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
     def tree(value):
         items = _tree_items(value)
         output = []
-        for index, (key, val) in enumerate(items):
+        for index, (key, val, inline) in enumerate(items):
             last = index == len(items) - 1
-            branch = "└──" if last else "├──"
-            continuation = "   " if last else "│  "
             if key:
-                output.append(content(f"{branch} {key}"))
-                children = val.splitlines() or ["(none provided)"]
-                for child in children:
-                    wrapped = wrapped_lines(child, max(20, inner - 10))
-                    for part in wrapped:
-                        output.append(content(f"{continuation}    {part}"))
+                if inline:
+                    label = f"  » {key}:"
+                    prefix = label + " "
+                    wrapped = wrapped_lines(val, max(20, inner - len(prefix)))
+                    for part_index, part in enumerate(wrapped):
+                        output.append(content((prefix if part_index == 0 else " " * len(prefix)) + part))
+                else:
+                    branch = "└──" if last else "├──"
+                    continuation = "   " if last else "│  "
+                    output.append(content(f"  {branch} {key}"))
+                    children = val.split("\n") if val else ["(none provided)"]
+                    for child in children:
+                        child = child.strip()
+                        if not child:
+                            output.append(content())
+                            continue
+                        subdetail = child.startswith((">", "›"))
+                        child = child.lstrip(">› ").strip()
+                        prefix = (f"  {continuation} › " if subdetail
+                                  else f"  {continuation}   ")
+                        wrapped = wrapped_lines(child, max(20, inner - len(prefix)))
+                        for part_index, part in enumerate(wrapped):
+                            output.append(content((prefix if part_index == 0 else " " * len(prefix)) + part))
             else:
-                wrapped = wrapped_lines(val, max(20, inner - 5))
-                is_sentence = val.rstrip().endswith((".", "!", "?")) or len(val) > 60
+                if not val:
+                    output.append(content())
+                    continue
+                subdetail = val.startswith((">", "›"))
+                val = val.lstrip(">› ").strip()
+                prefix = "      › " if subdetail else "        "
+                wrapped = wrapped_lines(val, max(20, inner - len(prefix)))
                 for part_index, part in enumerate(wrapped):
-                    if is_sentence:
-                        mark = "    "
-                    else:
-                        mark = branch if part_index == 0 else continuation + "  "
-                    output.append(content(f"{mark} {part}"))
+                    output.append(content((prefix if part_index == 0 else " " * len(prefix)) + part))
+            if not last:
+                separator = content("  │" if key and not inline else "")
+                if not output or output[-1] != separator:
+                    output.append(separator)
         return output
 
     lines = [divider()]
