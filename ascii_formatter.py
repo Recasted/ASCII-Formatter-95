@@ -294,6 +294,9 @@ class App:
         self.title_style.bind("<KeyRelease>", self.filter_title_styles)
         self.title_style.bind("<Return>", self.choose_first_style)
         self.title_style.bind("<<ComboboxSelected>>", lambda _e: self.refresh())
+        self.title_style.bind("<Button-1>", self.prepare_style_popup, add="+")
+        self._style_popup_typed = False
+        self._style_popup_command = self.root.register(self.type_in_style_popup)
         self.info = self.field(form, "Information")
         self.explanation = self.field(form, "Explanation")
         self.reason = self.field(form, "Reason")
@@ -440,6 +443,45 @@ class App:
             ))
         # Tolerate small spelling differences, e.g. "calligrafy" -> "caligraphy".
         return get_close_matches(search_query, self.title_styles, n=30, cutoff=0.35)
+
+    def prepare_style_popup(self, _event=None):
+        """Let keystrokes edit/filter the combobox even while its list is open."""
+        self._style_popup_typed = False
+        self.root.after(20, self.bind_style_popup)
+
+    def bind_style_popup(self):
+        try:
+            popup = self.root.tk.call("ttk::combobox::PopdownWindow", str(self.title_style))
+            listbox = f"{popup}.f.l"
+            script = f'if {{[{self._style_popup_command} %A %K] eq "break"}} {{break}}'
+            self.root.tk.call("bind", listbox, "<KeyPress>", script)
+        except tk.TclError:
+            pass
+
+    def type_in_style_popup(self, character, keysym):
+        if keysym == "BackSpace":
+            query = self.title_style.get() if self._style_popup_typed else ""
+            self.title_style.set(query[:-1])
+        elif character and character.isprintable():
+            query = self.title_style.get() if self._style_popup_typed else ""
+            self.title_style.set(query + character)
+        else:
+            return ""
+        self._style_popup_typed = True
+        matches = self.matching_styles()
+        self.title_style.configure(values=matches)
+        try:
+            popup = self.root.tk.call("ttk::combobox::PopdownWindow", str(self.title_style))
+            listbox = f"{popup}.f.l"
+            self.root.tk.call(listbox, "delete", 0, "end")
+            for style in matches:
+                self.root.tk.call(listbox, "insert", "end", style)
+            if matches:
+                self.root.tk.call(listbox, "selection", "set", 0)
+                self.root.tk.call(listbox, "see", 0)
+        except tk.TclError:
+            pass
+        return "break"
 
     def filter_title_styles(self, _event=None):
         matches = self.matching_styles()
