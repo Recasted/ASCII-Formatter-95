@@ -136,13 +136,10 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
         if label.strip() or body.strip()
     ]
     sections = custom_sections + _classify_information(info)
-    brief_items = []
-    if explanation.strip():
-        brief_items.append(("Explanation", explanation.strip()))
-    if reason.strip():
-        brief_items.append(("Reason", reason.strip()))
-    if not brief_items:
-        brief_items.append(("Brief", "(none provided)"))
+    brief_items = [
+        ("EXPLANATION", explanation.strip() or "(none provided)"),
+        ("REASON", reason.strip() or "(none provided)"),
+    ]
 
     # The title canvas dictates auto-fit width. Body text always wraps inside it.
     required = max([len(line) for line in art_lines] + [len(title) + 12, 82])
@@ -159,6 +156,14 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
         right = filler - left
         return f"-(╠{char * left}&{char * right}╣)-"
 
+    def wrapped_lines(value, width):
+        """Wrap every source line separately so embedded newlines cannot break borders."""
+        output = []
+        for source_line in value.splitlines() or [""]:
+            output.extend(textwrap.wrap(source_line, width, replace_whitespace=True,
+                                        drop_whitespace=True) or [""])
+        return output
+
     def tree(value):
         items = _tree_items(value)
         output = []
@@ -168,12 +173,12 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
             continuation = "   " if last else "│  "
             if key:
                 output.append(content(f"{branch} {key}"))
-                wrapped = textwrap.wrap(val, max(20, inner - 7), replace_whitespace=False) or [""]
+                wrapped = wrapped_lines(val, max(20, inner - 7))
                 for part_index, part in enumerate(wrapped):
                     twig = "└─" if part_index == len(wrapped) - 1 else "├─"
                     output.append(content(f"{continuation} {twig} {part}"))
             else:
-                wrapped = textwrap.wrap(val, max(20, inner - 5), replace_whitespace=False) or [""]
+                wrapped = wrapped_lines(val, max(20, inner - 5))
                 for part_index, part in enumerate(wrapped):
                     mark = branch if part_index == 0 else continuation + "  "
                     output.append(content(f"{mark} {part}"))
@@ -185,17 +190,12 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
         # Center the complete FIGlet canvas, not each row independently.
         # Individual row centering makes shorter lower strokes drift right.
         lines.append(content(line.ljust(art_width), "center"))
-    lines += [content(), divider(), content("BRIEF // EXPLANATION & REASON", "center"), content()]
-    for index, (label, value) in enumerate(brief_items):
-        last = index == len(brief_items) - 1
-        branch = "└──" if last else "├──"
-        continuation = "   " if last else "│  "
-        lines.append(content(f"{branch} {label}"))
-        wrapped = textwrap.wrap(value, max(20, inner - 7), replace_whitespace=False) or [""]
-        for part_index, part in enumerate(wrapped):
-            twig = "└─" if part_index == len(wrapped) - 1 else "├─"
-            lines.append(content(f"{continuation} {twig} {part}"))
-    lines += [content(), divider(), content("AUTOMATIC INFORMATION INDEX", "center"), content()]
+    lines += [content(), divider()]
+    for label, value in brief_items:
+        lines += [content(f"[ {label} ]", "center"), content()]
+        lines += tree(value)
+        lines += [content(), divider()]
+    lines += [content("AUTOMATIC INFORMATION INDEX", "center"), content()]
     for index, (label, _) in enumerate(sections, 1):
         connector = "└──" if index == len(sections) else "├──"
         lines.append(content(f"{connector} {index:02d}. {label.title()}"))
