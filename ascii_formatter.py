@@ -584,10 +584,21 @@ class App:
                              self.custom_section_values(), self.value(self.info_title))
 
     def refresh(self):
+        had_content = self.preview.compare("end-1c", ">", "1.0")
+        old_yview = self.preview.yview()
+        old_xview = self.preview.xview()
+        top_index = self.preview.index("@0,0")
+        was_at_bottom = bool(had_content and old_yview and old_yview[1] >= 0.999)
         self.preview.configure(state="normal")
         self.preview.delete("1.0", "end")
         self.preview.insert("1.0", self.result())
         self.preview.configure(state="disabled")
+        if was_at_bottom:
+            self.preview.yview_moveto(1.0)
+        else:
+            self.preview.yview(top_index)
+        if old_xview:
+            self.preview.xview_moveto(old_xview[0])
         self.status.configure(text="Preview updated")
 
     def copy(self):
