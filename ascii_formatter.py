@@ -280,6 +280,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.auto_fit = tk.BooleanVar(value=True)
+        self.warned_char_thresholds = set()
         root.title("Sog95")
         icon_path = os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(__file__)), "ascii_formatter_95.ico")
         if os.path.exists(icon_path):
@@ -643,7 +644,31 @@ class App:
                              width, self.auto_fit.get(), self.title_style.get(),
                              self.custom_section_values(), self.value(self.info_title))
 
+    def input_character_count(self):
+        total = sum(len(self.value(widget)) for widget in
+                    (self.title, self.info_title, self.explanation, self.reason, self.info))
+        for item in self.custom_sections:
+            total += len(self.value(item["title"])) + len(self.value(item["body"]))
+        return total
+
+    def check_character_warnings(self):
+        count = self.input_character_count()
+        thresholds = (
+            (100_000, "Large document warning",
+             "This document exceeds 100,000 characters. Live preview updates may become slower."),
+            (1_000_000, "Extreme document size warning",
+             "This document exceeds 1,000,000 characters. Previewing, copying, and exporting may take significant time."),
+        )
+        for threshold, title, message in thresholds:
+            if count > threshold and threshold not in self.warned_char_thresholds:
+                self.warned_char_thresholds.add(threshold)
+                self.root.after_idle(lambda t=title, m=message, c=count:
+                    messagebox.showwarning(t, f"{m}\n\nCurrent input size: {c:,} characters."))
+            elif count <= threshold:
+                self.warned_char_thresholds.discard(threshold)
+
     def refresh(self):
+        self.check_character_warnings()
         had_content = self.preview.compare("end-1c", ">", "1.0")
         old_yview = self.preview.yview()
         old_xview = self.preview.xview()
