@@ -128,14 +128,18 @@ def _classify_information(value):
 
 
 def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=True,
-                  title_style="graffiti", additional_sections=None):
+                  title_style="graffiti", additional_sections=None, info_title=""):
     art_lines = ascii_title(title, title_style).splitlines()
     custom_sections = [
         ((label.strip() or "UNTITLED DIVIDER").upper(), body.strip())
         for label, body in (additional_sections or [])
         if label.strip() or body.strip()
     ]
-    sections = custom_sections + _classify_information(info)
+    if info_title.strip():
+        information_sections = [(info_title.strip().upper(), info.strip() or "(none provided)")]
+    else:
+        information_sections = _classify_information(info)
+    sections = information_sections + custom_sections
     brief_items = [
         ("EXPLANATION", explanation.strip() or "(none provided)"),
         ("REASON", reason.strip() or "(none provided)"),
@@ -293,6 +297,8 @@ class App:
         self._style_popup_command = self.root.register(self.type_in_style_popup)
         self.explanation = self.field(form, "Explanation")
         self.reason = self.field(form, "Reason")
+        self.info_title = self.field(form, "Main information section title", one_line=True)
+        self.info_title.insert(0, "Other Information")
         self.info = self.field(form, "Information")
 
         self.custom_sections = []
@@ -353,7 +359,7 @@ class App:
         self.status = tk.Label(root, text="Ready", bg=BG, bd=2, relief="sunken", anchor="w")
         self.status.pack(fill="x", padx=5, pady=(0, 5))
         self.title.insert(0, "MY REPORT")
-        for widget in (self.title, self.info, self.explanation, self.reason):
+        for widget in (self.title, self.info_title, self.info, self.explanation, self.reason):
             widget.bind("<KeyRelease>", lambda _e: self.refresh())
         self.refresh()
 
@@ -538,6 +544,8 @@ class App:
 
     def clear(self):
         self.title.delete(0, "end")
+        self.info_title.delete(0, "end")
+        self.info_title.insert(0, "Other Information")
         for widget in (self.info, self.explanation, self.reason):
             widget.delete("1.0", "end")
         for item in list(self.custom_sections):
@@ -573,7 +581,7 @@ class App:
         return make_document(self.value(self.title), self.value(self.info),
                              self.value(self.explanation), self.value(self.reason),
                              width, self.auto_fit.get(), self.title_style.get(),
-                             self.custom_section_values())
+                             self.custom_section_values(), self.value(self.info_title))
 
     def refresh(self):
         self.preview.configure(state="normal")
