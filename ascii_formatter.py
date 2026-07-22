@@ -132,24 +132,31 @@ def _classify_information(value):
         ("FINANCIAL INFORMATION", re.compile(r"\b(bank|iban|swift|routing|card|credit|debit|payment|mortgage|balance|\$|€|£)\b", re.I)),
         ("LOCATIONS / ADDRESSES", re.compile(r"\b(address|street|road|avenue|city|state|country|postal|postcode|zip|location|coordinates?)\b", re.I)),
         ("ACCOUNTS / USERNAMES", re.compile(r"\b(account|username|user name|alias|handle|profile|discord|telegram|instagram|twitter|github)\b", re.I)),
+        ("SOCIAL MEDIA", re.compile(r"\b(social media|snapchat|tiktok|facebook|youtube|reddit|post(?:ed|ing)?|follower)\b", re.I)),
+        ("EDUCATION", re.compile(r"\b(education|school|college|university|degree|student|graduate|graduated|course|academic)\b", re.I)),
+        ("EMPLOYMENT / OCCUPATION", re.compile(r"\b(employment|employer|employee|occupation|job|work(?:ed|ing)?|company|manager|engineer|intern)\b", re.I)),
+        ("RELATIONSHIPS / ASSOCIATES", re.compile(r"\b(relationship|associate|friend|girlfriend|boyfriend|partner|spouse|wife|husband|relative)\b", re.I)),
+        ("VEHICLES", re.compile(r"\b(vehicle|car|truck|motorcycle|license plate|registration|vin)\b", re.I)),
         ("DATES / TIMELINE", re.compile(r"\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2}|date|born|birthday|created|updated)\b", re.I)),
         ("IDENTITY / PERSONAL", re.compile(r"\b(name|age|gender|pronouns?|occupation|school|employer|family|mother|father|sister|brother)\b", re.I)),
         ("DEVICES / SYSTEM", re.compile(r"\b(device|computer|windows|linux|mac|android|iphone|hostname|browser|operating system|hardware)\b", re.I)),
         ("LEGAL / COURT INFORMATION", re.compile(r"\b(court|legal|charge|plea|sentence|sentencing|trial|bail|judge|prosecutor|defendant|convicted|custody|probation|hearing|evidence)\b", re.I)),
+        ("EVIDENCE / SOURCES", re.compile(r"\b(evidence|source|report|record|document|screenshot|photo|video|archive|statement|admission)\b", re.I)),
+        ("INCIDENT / ALLEGATIONS", re.compile(r"\b(incident|allegation|accused|abuse|torture|harm(?:ed|ing)?|kill(?:ed|ing)?|murder|victim|threat|attack|crime)\b", re.I)),
     )
     for raw in value.splitlines():
         line = raw.strip()
         if not line:
             continue
-        category = "OTHER INFORMATION"
+        category = "CONTEXT / SUMMARY"
         for label, pattern in patterns:
             if pattern.search(line):
                 category = label
                 break
         buckets.setdefault(category, []).append(line)
     if not buckets:
-        buckets["OTHER INFORMATION"] = ["(none provided)"]
-    order = [label for label, _ in patterns] + ["OTHER INFORMATION"]
+        buckets[""] = ["(none provided)"]
+    order = [label for label, _ in patterns] + ["CONTEXT / SUMMARY", ""]
     return [(label, "\n".join(buckets[label])) for label in order if label in buckets]
 
 
@@ -164,7 +171,8 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
     if info_title.strip():
         information_sections = [(info_title.strip().upper(), info.strip() or "(none provided)")]
     else:
-        information_sections = _classify_information(info)
+        information_sections = [(label or "INFORMATION", body)
+                                for label, body in _classify_information(info)]
     sections = information_sections + custom_sections
     brief_items = [
         ("EXPLANATION", explanation.strip() or "(none provided)"),
@@ -198,7 +206,7 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
         items = _tree_items(value)
         meaningful = value.strip() and value.strip() != "(none provided)"
         if auto_sort and meaningful and not any(key for key, _val, _inline in items):
-            items = [(label.title(), body, False)
+            items = [(label.title(), body, False) if label else ("", body, False)
                      for label, body in _classify_information(value)]
         output = []
         for index, (key, val, inline) in enumerate(items):
@@ -350,7 +358,7 @@ class App:
         self.explanation = self.field(form, "Explanation")
         self.reason = self.field(form, "Reason")
         self.info_title = self.field(form, "Main information section title", one_line=True)
-        self.info_title.insert(0, "Other Information")
+        self.info_title.insert(0, "Information")
         self.info = self.field(form, "Information")
 
         self.custom_sections = []
@@ -597,7 +605,7 @@ class App:
     def clear(self):
         self.title.delete(0, "end")
         self.info_title.delete(0, "end")
-        self.info_title.insert(0, "Other Information")
+        self.info_title.insert(0, "Information")
         for widget in (self.info, self.explanation, self.reason):
             widget.delete("1.0", "end")
         for item in list(self.custom_sections):
