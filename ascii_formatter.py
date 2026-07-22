@@ -291,9 +291,9 @@ class App:
         self.title_style.bind("<Button-1>", self.prepare_style_popup, add="+")
         self._style_popup_typed = False
         self._style_popup_command = self.root.register(self.type_in_style_popup)
-        self.info = self.field(form, "Information")
         self.explanation = self.field(form, "Explanation")
         self.reason = self.field(form, "Reason")
+        self.info = self.field(form, "Information")
 
         self.custom_sections = []
         self.extra_area = tk.LabelFrame(form, text="Subtitle / divider boxes (0 / 8)",
