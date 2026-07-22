@@ -417,8 +417,15 @@ class App:
         self.preview.bind("<Shift-MouseWheel>", self.horizontal_wheel)
         self.preview.bind("<Control-MouseWheel>", self.control_zoom_preview)
 
-        self.status = tk.Label(root, text="Ready", bg=BG, bd=2, relief="sunken", anchor="w")
-        self.status.pack(fill="x", padx=5, pady=(0, 5))
+        status_bar = tk.Frame(root, bg=BG)
+        status_bar.pack(fill="x", padx=5, pady=(0, 5))
+        self.status = tk.Label(status_bar, text="Ready", bg=BG, bd=2,
+                               relief="sunken", anchor="w")
+        self.status.pack(side="left", fill="x", expand=True)
+        self.char_count_label = tk.Label(status_bar, text="Characters: 0", bg=BG,
+                                          bd=2, relief="sunken", anchor="e",
+                                          width=22, font=("MS Sans Serif", 8, "bold"))
+        self.char_count_label.pack(side="right", padx=(4, 0))
         self.title.insert(0, "MY REPORT")
         for widget in (self.title, self.info_title, self.info, self.explanation, self.reason):
             widget.bind("<KeyRelease>", lambda _e: self.refresh())
@@ -653,6 +660,8 @@ class App:
 
     def check_character_warnings(self):
         count = self.input_character_count()
+        colour = "#800000" if count > 1_000_000 else ("#805000" if count > 100_000 else BLACK)
+        self.char_count_label.configure(text=f"Characters: {count:,}", fg=colour)
         thresholds = (
             (100_000, "Large document warning",
              "This document exceeds 100,000 characters. Live preview updates may become slower."),
