@@ -196,7 +196,8 @@ def make_document(title, info, explanation, reason, minimum_width=82, auto_fit=T
 
     def tree(value, auto_sort=False):
         items = _tree_items(value)
-        if auto_sort and not any(key for key, _val, _inline in items):
+        meaningful = value.strip() and value.strip() != "(none provided)"
+        if auto_sort and meaningful and not any(key for key, _val, _inline in items):
             items = [(label.title(), body, False)
                      for label, body in _classify_information(value)]
         output = []
